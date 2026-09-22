@@ -1,7 +1,32 @@
 import math
 import osmnx as ox
 
+_cached_hospitals = None
+
+def _assign_specialization(name: str) -> str:
+    name_lower = name.lower()
+    if "trauma" in name_lower or "casualty" in name_lower:
+        return "Level-1 Trauma & Emergency"
+    elif "eye" in name_lower or "dr. r. p." in name_lower:
+        return "Ophthalmology & Trauma"
+    elif "dental" in name_lower:
+        return "Maxillofacial & Dental"
+    elif "heart" in name_lower or "cardio" in name_lower:
+        return "Cardiology & Intensive Care"
+    elif "child" in name_lower or "pediatric" in name_lower or "kalawati" in name_lower:
+        return "Pediatrics & Neonatal Care"
+    elif "ayurvedic" in name_lower or "tibbia" in name_lower:
+        return "General Medicine"
+    elif "chest" in name_lower or "tb" in name_lower or "infectious" in name_lower:
+        return "Pulmonology & Critical Care"
+    else:
+        return "Multi-Specialty Emergency"
+
 def get_dynamic_hospitals():
+    global _cached_hospitals
+    if _cached_hospitals is not None:
+        return _cached_hospitals
+
     try:
         # Same bounding box area as your routing engine (Central Delhi)
         # format: (west, south, east, north)
@@ -12,7 +37,11 @@ def get_dynamic_hospitals():
         gdf = ox.features_from_bbox(bbox=bbox, tags=tags)
         
         hospitals = []
-        for idx, row in gdf.iterrows():
+        # Predefined realistic variation for prototype demonstration
+        capacities = [120, 180, 250, 90, 310, 140, 200, 160, 220, 85]
+        occupancies = [70, 145, 190, 65, 260, 95, 150, 110, 175, 55]
+
+        for idx, (osm_id, row) in enumerate(gdf.iterrows()):
             name = row.get("name")
             # Skip entries without a proper name
             if not name or (isinstance(name, float) and math.isnan(name)):
@@ -24,28 +53,38 @@ def get_dynamic_hospitals():
             lon = geom.centroid.x
             
             # Extract street address if available in OSM tags
-            street = row.get("addr:street", "Central Delhi")
+            street = row.get("addr:street")
             city = row.get("addr:city", "New Delhi")
-            address = f"{street}, {city}" if street else "New Delhi, Delhi"
+            address = f"{street}, {city}" if street and not (isinstance(street, float) and math.isnan(street)) else "Central Delhi, New Delhi"
+
+            cap = capacities[idx % len(capacities)]
+            occ = occupancies[idx % len(occupancies)]
+            specialization = _assign_specialization(str(name))
 
             hospitals.append({
-                "id": str(idx),
+                "id": str(osm_id),
                 "name": str(name),
                 "address": str(address),
                 "latitude": float(lat),
                 "longitude": float(lon),
-                "total_beds": 150,      # Dynamic baseline capacity model
-                "occupied_beds": 75     # Dynamic baseline load model
+                "total_beds": cap,
+                "occupied_beds": occ,
+                "available_beds": cap - occ,
+                "specialization": specialization,
+                "emergency_capable": True,
+                "status": "Operational",
+                "phone": "+91 11 2323 " + str(1000 + (idx * 37) % 9000)
             })
             
         if hospitals:
             print(f"Successfully loaded {len(hospitals)} real hospitals from OpenStreetMap!")
-            return hospitals
+            _cached_hospitals = hospitals
+            return _cached_hospitals
     except Exception as e:
         print(f"OSM hospital fetch warning: {e}. Falling back to curated registry.")
 
     # Fallback registry if Overpass API is rate-limited
-    return [
+    _cached_hospitals = [
         {
             "id": "H1",
             "name": "Lok Nayak Jai Prakash Hospital (LNJP)",
@@ -54,6 +93,11 @@ def get_dynamic_hospitals():
             "longitude": 77.2410,
             "total_beds": 200,
             "occupied_beds": 170,
+            "available_beds": 30,
+            "specialization": "Multi-Specialty Emergency & Level-1 Trauma",
+            "emergency_capable": True,
+            "status": "Operational",
+            "phone": "+91 11 2323 3000"
         },
         {
             "id": "H2",
@@ -63,8 +107,14 @@ def get_dynamic_hospitals():
             "longitude": 77.2130,
             "total_beds": 120,
             "occupied_beds": 90,
+            "available_beds": 30,
+            "specialization": "Pediatrics, Gynecology & General Emergency",
+            "emergency_capable": True,
+            "status": "Operational",
+            "phone": "+91 11 2336 3728"
         },
     ]
+    return _cached_hospitals
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -107,6 +157,30 @@ def get_best_hospital(incident_lat, incident_lon):
           "address": h["address"],
           "available_beds": available_beds,
           "distance_km": round(distance_km, 2),
+          "latitude": h["latitude"],
+          "longitude": h["longitude"],
+          "specialization": h.get("specialization", "Multi-Specialty Emergency"),
+          "score": round(score, 3),
       }
 
   return best
+
+
+def get_all_hospitals(incident_lat=None, incident_lon=None):
+  """Returns all dynamic hospitals with calculated distances if coordinates are provided."""
+  hospitals_list = get_dynamic_hospitals()
+  results = []
+  for h in hospitals_list:
+    item = dict(h)
+    if incident_lat is not None and incident_lon is not None:
+      dist = haversine_distance(
+          incident_lat, incident_lon, h["latitude"], h["longitude"]
+      )
+      item["distance_km"] = round(dist, 2)
+    else:
+      item["distance_km"] = None
+    results.append(item)
+
+  if incident_lat is not None and incident_lon is not None:
+    results.sort(key=lambda x: (x["distance_km"] if x["distance_km"] is not None else 99999))
+  return results
