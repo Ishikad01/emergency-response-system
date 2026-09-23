@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hospital, Navigation, Clock, Shield, Network, AlertOctagon, Info } from 'lucide-react';
+import { Hospital, Navigation, Clock, Shield, Network, AlertOctagon, Info, Maximize2, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 export default function RouteAnalysisCard({ routeData, selectedHospital, selectedAmbulance, onClearRoute }) {
   if (!routeData) {
@@ -10,7 +10,7 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
           No Active Route Selected
         </div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
-          Click an emergency or dispatch a unit to compute NetworkX Dijkstra shortest path routing.
+          Click an emergency or dispatch a unit to compute NetworkX Dijkstra shortest path routing with road width and area telemetry.
         </div>
       </div>
     );
@@ -19,6 +19,15 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
   const hospital = selectedHospital || routeData.assigned_hospital;
   const ambulance = selectedAmbulance || routeData.assigned_ambulance;
   const routing = routeData.routing_details || routeData;
+
+  const bypassCode = routing?.bypass_status_code || 'FEASIBLE';
+  const bypassStatus = routing?.bypass_feasibility || 'BYPASS FEASIBLE';
+  const bypassRecommendation = routing?.bypass_recommendation || 'Route road width allows emergency overtaking across adjacent lanes or shoulder.';
+
+  const avgWidth = routing?.road_width_avg_m ?? 7.5;
+  const minWidth = routing?.road_width_min_m ?? 7.0;
+  const totalArea = routing?.road_area_total_m2 ?? 12366;
+  const sectorName = routing?.sector || 'Operational Dispatch Grid';
 
   return (
     <div className="command-card" style={{ padding: '18px', border: '1px solid var(--border-active)' }}>
@@ -48,8 +57,8 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-bright)' }}>
               Tactical Route Analysis
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-              OpenStreetMap NetworkX Graph Engine
+            <div style={{ fontSize: '0.68rem', color: '#38bdf8', fontWeight: 500 }}>
+              {sectorName}
             </div>
           </div>
         </div>
@@ -81,10 +90,10 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
           </span>
         </div>
         <div style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-bright)', marginTop: '4px' }}>
-          {hospital?.name || 'Lok Nayak Hospital (LNJP)'}
+          {hospital?.name || 'Local Hospital'}
         </div>
         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-          {hospital?.address || 'Central Delhi Corridor'}
+          {hospital?.address || 'Institutional Corridor'}
         </div>
       </div>
 
@@ -105,7 +114,7 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
             <Navigation size={12} /> Route Distance
           </div>
           <div className="mono" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38bdf8', marginTop: '2px' }}>
-            {routing?.distance_km ?? (hospital?.distance_km || 2.4)} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>km</span>
+            {routing?.distance_km ?? (hospital?.distance_km || 1.66)} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>km</span>
           </div>
         </div>
 
@@ -119,8 +128,68 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
             <Clock size={12} /> Estimated Transit
           </div>
           <div className="mono" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fcd34d', marginTop: '2px' }}>
-            {routing?.estimated_time_min ?? 5.2} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>min</span>
+            {routing?.estimated_time_min ?? 2.8} <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>min</span>
           </div>
+        </div>
+      </div>
+
+      {/* Real-Time Road Width & Area Calculation (Panel Specific Requirement) */}
+      <div style={{
+        padding: '12px',
+        borderRadius: '6px',
+        backgroundColor: 'rgba(56, 189, 248, 0.05)',
+        border: '1px solid rgba(56, 189, 248, 0.3)',
+        marginBottom: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+            <Maximize2 size={13} /> Road Width & Surface Area
+          </div>
+          <span className="badge badge-demo" style={{ fontSize: '0.6rem' }}>IRC:86 Standards</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ backgroundColor: 'var(--bg-main)', padding: '8px 10px', borderRadius: '4px' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Avg. Road Width:</div>
+            <div className="mono" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-bright)' }}>
+              {avgWidth} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>m</span>
+            </div>
+          </div>
+          <div style={{ backgroundColor: 'var(--bg-main)', padding: '8px 10px', borderRadius: '4px' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Total Road Area:</div>
+            <div className="mono" style={{ fontSize: '1rem', fontWeight: 700, color: '#6ee7b7' }}>
+              {Number(totalArea).toLocaleString()} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>m²</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          <span>Narrowest Bottleneck:</span>
+          <span className="mono" style={{ color: minWidth < 5.0 ? '#f87171' : '#fcd34d', fontWeight: 600 }}>
+            {minWidth} m
+          </span>
+        </div>
+      </div>
+
+      {/* Ambulance Bypass Feasibility Telemetry */}
+      <div style={{
+        padding: '12px',
+        borderRadius: '6px',
+        backgroundColor: bypassCode === 'FEASIBLE' ? 'rgba(16, 185, 129, 0.08)' : bypassCode === 'RESTRICTED' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+        border: `1px solid ${bypassCode === 'FEASIBLE' ? 'rgba(16, 185, 129, 0.3)' : bypassCode === 'RESTRICTED' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+        marginBottom: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: bypassCode === 'FEASIBLE' ? '#6ee7b7' : bypassCode === 'RESTRICTED' ? '#fcd34d' : '#fca5a5' }}>
+            {bypassCode === 'FEASIBLE' ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+            <span>Ambulance Bypass Status</span>
+          </div>
+          <span className={bypassCode === 'FEASIBLE' ? 'badge badge-operational' : bypassCode === 'RESTRICTED' ? 'badge badge-high' : 'badge badge-critical'} style={{ fontSize: '0.62rem' }}>
+            {bypassStatus}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.35 }}>
+          {bypassRecommendation}
         </div>
       </div>
 
@@ -157,7 +226,7 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
         borderRadius: '6px',
         backgroundColor: 'rgba(239, 68, 68, 0.08)',
         border: '1px solid rgba(239, 68, 68, 0.25)',
-        marginBottom: '14px',
+        marginBottom: '12px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fca5a5', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>
           <AlertOctagon size={13} /> Road Network Status
@@ -166,7 +235,7 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
           {routing?.simulation_event || 'Simulated edge blockage bypassed via dynamic Dijkstra recalculation.'}
         </div>
         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Graph Size: {routing?.graph_nodes_count || 7103} intersections in Delhi Central Drive Grid.
+          Graph Size: {routing?.graph_nodes_count || 676} road intersections mapped.
         </div>
       </div>
 
@@ -182,7 +251,7 @@ export default function RouteAnalysisCard({ routeData, selectedHospital, selecte
       }}>
         <Info size={13} style={{ color: '#94a3b8', marginTop: '2px', flexShrink: 0 }} />
         <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.3 }}>
-          <strong>Academic Note:</strong> Route distance and path nodes calculated via OSMnx road graph topology. Does not utilize live third-party commercial traffic APIs.
+          <strong>Academic Formulation:</strong> Width derived from OSM tags & IRC:86-1983 standards ($3.5\text{m}$ lane baseline). Area $= \sum (L_i \times W_i)$. Bypass threshold: $\ge 5.0\text{m}$.
         </div>
       </div>
     </div>

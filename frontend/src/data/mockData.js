@@ -6,6 +6,12 @@
 
 export const DEMO_LOCATION_PRESETS = [
   {
+    name: "Jaypee Institute of Information Technology (JIIT), Sector 62, Noida",
+    lat: 28.6295,
+    lon: 77.3725,
+    description: "College campus institutional corridor adjacent to Fortis Hospital (Sector 62 Noida)",
+  },
+  {
     name: "Connaught Place Inner Circle (Central Delhi)",
     lat: 28.6315,
     lon: 77.2167,

@@ -1,3 +1,5 @@
+import os
+import json
 import math
 import osmnx as ox
 
@@ -117,6 +119,53 @@ def get_dynamic_hospitals():
     return _cached_hospitals
 
 
+def is_near_jiit(lat, lon):
+  """Checks whether coordinates fall within the Noida Sector 62 / JIIT campus area."""
+  return (28.58 <= lat <= 28.67) and (77.32 <= lon <= 77.42)
+
+
+def get_jiit_hospitals():
+  """Loads real hospitals around Jaypee Institute of Information Technology (Sector 62, Noida)."""
+  cache_file = os.path.join(os.path.dirname(__file__), "cache", "jiit_hospitals.json")
+  if os.path.exists(cache_file):
+    try:
+      with open(cache_file, "r") as f:
+        return json.load(f)
+    except Exception as e:
+      print(f"Error reading JIIT hospitals cache: {e}")
+
+  return [
+      {
+          "id": "JIIT_H_FORTIS",
+          "name": "Fortis Hospital, Sector 62",
+          "address": "B-22, Sector 62, Noida, Uttar Pradesh",
+          "latitude": 28.6183686,
+          "longitude": 77.3735841,
+          "total_beds": 250,
+          "occupied_beds": 165,
+          "available_beds": 85,
+          "specialization": "Multi-Specialty Emergency & Level-1 Trauma",
+          "emergency_capable": True,
+          "status": "Operational",
+          "phone": "+91 120 430 0222",
+      },
+      {
+          "id": "JIIT_H_SHANTI",
+          "name": "Shanti Gopal Hospital",
+          "address": "Mall Road, Ahinsa Khand 2, Indirapuram, Ghaziabad",
+          "latitude": 28.6418,
+          "longitude": 77.3793,
+          "total_beds": 120,
+          "occupied_beds": 75,
+          "available_beds": 45,
+          "specialization": "General Emergency & Intensive Care",
+          "emergency_capable": True,
+          "status": "Operational",
+          "phone": "+91 120 477 7000",
+      },
+  ]
+
+
 def haversine_distance(lat1, lon1, lat2, lon2):
   """Calculates the great-circle distance between two GPS points in kilometers."""
   R = 6371.0  # Earth radius in kilometers
@@ -133,7 +182,11 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 
 def get_best_hospital(incident_lat, incident_lon):
-  hospitals_list = get_dynamic_hospitals()
+  if is_near_jiit(incident_lat, incident_lon):
+    hospitals_list = get_jiit_hospitals()
+  else:
+    hospitals_list = get_dynamic_hospitals()
+
   best = None
   min_score = float("inf")
 
@@ -168,7 +221,11 @@ def get_best_hospital(incident_lat, incident_lon):
 
 def get_all_hospitals(incident_lat=None, incident_lon=None):
   """Returns all dynamic hospitals with calculated distances if coordinates are provided."""
-  hospitals_list = get_dynamic_hospitals()
+  if incident_lat is not None and incident_lon is not None and is_near_jiit(incident_lat, incident_lon):
+    hospitals_list = get_jiit_hospitals()
+  else:
+    hospitals_list = get_dynamic_hospitals()
+
   results = []
   for h in hospitals_list:
     item = dict(h)
